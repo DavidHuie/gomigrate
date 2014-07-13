@@ -1,5 +1,41 @@
 package gomigrate
 
+import (
+	"path/filepath"
+	"strconv"
+)
+
+// Returns the migration number, type and base name, so 1, "up", "migration" from "01_migration_up.sql"
+func parseMigrationPath(path string) (uint64, string, string, error) {
+	filebase := filepath.Base(path)
+
+	// Check to see if this is a up migration.
+	matches := upMigrationFile.FindAllSubmatch([]byte(filebase), -1)
+	if matches != nil {
+		num := matches[0][1]
+		name := matches[0][2]
+		parsedNum, err := strconv.ParseUint(string(num), 10, 64)
+		if err != nil {
+			return 0, "", "", err
+		}
+		return parsedNum, "up", string(name), nil
+	}
+
+	// Down migration.
+	matches = downMigrationFile.FindAllSubmatch([]byte(filebase), -1)
+	if matches != nil {
+		num := matches[0][1]
+		name := matches[0][2]
+		parsedNum, err := strconv.ParseUint(string(num), 10, 64)
+		if err != nil {
+			return 0, "", "", err
+		}
+		return parsedNum, "down", string(name), nil
+	}
+
+	return 0, "", "", InvalidMigrationFile
+}
+
 // This type is used to sort migration ids.
 
 type uint64slice []uint64
