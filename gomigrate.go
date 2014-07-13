@@ -1,4 +1,4 @@
-// A simple migrator for PostgreSQL.
+// A simple database migrator for PostgreSQL.
 
 package gomigrate
 
@@ -189,7 +189,6 @@ func (m *Migrator) fetchMigrations() error {
 			if path == "" {
 				path = migration.DownPath
 			}
-
 			log.Printf("Invalid migration pair for path: %s", path)
 			return InvalidMigrationPair
 		}
@@ -273,10 +272,12 @@ func (m *Migrator) Migrate() error {
 			return err
 		}
 		// Perform the migration.
-		_, err = transaction.Exec(string(sql))
-		if err != nil {
-			transaction.Rollback()
-			log.Printf("Error rolling back transaction: %v", err)
+		if _, err = transaction.Exec(string(sql)); err != nil {
+			log.Printf("Error executing migration: %v", err)
+			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				return rollbackErr
+			}
 			return err
 		}
 		// Log the exception in the migrations table.
@@ -287,28 +288,37 @@ func (m *Migrator) Migrate() error {
 			migration.Status,
 		)
 		if err != nil {
-			transaction.Rollback()
-			log.Printf("Error rolling back transaction: %v", err)
+			log.Printf("Error logging migration: %v", err)
+			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				return rollbackErr
+			}
 			return err
 		}
-		err = transaction.Commit()
-		if err != nil {
+		if err := transaction.Commit(); err != nil {
 			log.Printf("Error commiting transaction: %v", err)
 			return err
 		}
 		migration.Status = Active
-
-		log.Printf("Applied migration %s successfully", migration.Name)
 	}
 	return nil
 }
 
+var (
+	NoActiveMigrations = errors.New("No active migrations to rollback")
+)
+
 // Rolls back the last migration
 func (m *Migrator) Rollback() error {
 	migrations := m.Migrations(Active)
+
+	if len(migrations) == 0 {
+		return NoActiveMigrations
+	}
+
 	lastMigration := migrations[len(migrations)-1]
 
-	log.Print("Rolling back migration: %v", lastMigration.Name)
+	log.Printf("Rolling back migration: %v", lastMigration.Name)
 
 	sql, err := ioutil.ReadFile(lastMigration.DownPath)
 	if err != nil {
@@ -332,6 +342,5 @@ func (m *Migrator) Rollback() error {
 		return err
 	}
 	lastMigration.Status = Inactive
-	log.Print("Rolled back migration %v successfully", lastMigration.Name)
 	return nil
 }

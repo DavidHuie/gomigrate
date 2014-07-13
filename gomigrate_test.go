@@ -73,6 +73,46 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 	cleanup()
 }
 
+func TestMigrationAndRollback(t *testing.T) {
+	m, err := NewMigrator(db, "test_migrations/test1")
+	if err != nil {
+		t.Error(err)
+	}
+
+	if err := m.Migrate(); err != nil {
+		t.Error(err)
+	}
+
+	// Ensure that the migration ran.
+	row := db.QueryRow(
+		"SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1",
+		"test",
+	)
+	var tableName string
+	if err := row.Scan(&tableName); err != nil {
+		t.Error(err)
+	}
+	if tableName != "test" {
+		t.Errorf("Migration table not created")
+	}
+
+	if err := m.Rollback(); err != nil {
+		t.Error(err)
+	}
+
+	// Ensure that the down migration ran.
+	row = db.QueryRow(
+		"SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1",
+		"test",
+	)
+	err = row.Scan(&tableName)
+	if err != sql.ErrNoRows {
+		t.Errorf("Migration table should be deleted")
+	}
+
+	cleanup()
+}
+
 func cleanup() {
 	_, err := db.Exec("drop table gomigrate")
 	if err != nil {
