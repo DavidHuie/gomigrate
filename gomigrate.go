@@ -260,23 +260,23 @@ INSERT INTO gomigrate (migration_id, name, status) values ($1, $2, $3)
 // Applies all inactive migrations.
 func (m *Migrator) Migrate() error {
 	for _, migration := range m.Migrations(Inactive) {
-		log.Printf("Applying migration %s", migration.Name)
+		log.Printf("Applying migration: %s", migration.Name)
 
 		sql, err := ioutil.ReadFile(migration.UpPath)
 		if err != nil {
-			log.Print("Error reading up migration %s", migration.Name)
+			log.Printf("Error reading up migration: %s", migration.Name)
 			return err
 		}
 		transaction, err := m.DB.Begin()
 		if err != nil {
-			log.Print("Error opening transaction")
+			log.Printf("Error opening transaction: %v", err)
 			return err
 		}
 		// Perform the migration.
 		_, err = transaction.Exec(string(sql))
 		if err != nil {
 			transaction.Rollback()
-			log.Printf("Migration %s failed", migration.Name)
+			log.Printf("Error rolling back transaction: %v", err)
 			return err
 		}
 		// Log the exception in the migrations table.
@@ -288,12 +288,12 @@ func (m *Migrator) Migrate() error {
 		)
 		if err != nil {
 			transaction.Rollback()
-			log.Printf("Migration logging for %s failed", migration.Name)
+			log.Printf("Error rolling back transaction: %v", err)
 			return err
 		}
 		err = transaction.Commit()
 		if err != nil {
-			log.Print("Error commiting transaction")
+			log.Printf("Error commiting transaction: %v", err)
 			return err
 		}
 		migration.Status = Active
@@ -307,23 +307,31 @@ func (m *Migrator) Migrate() error {
 func (m *Migrator) Rollback() error {
 	migrations := m.Migrations(Active)
 	lastMigration := migrations[len(migrations)-1]
+
+	log.Print("Rolling back migration: %v", lastMigration.Name)
+
 	sql, err := ioutil.ReadFile(lastMigration.DownPath)
 	if err != nil {
+		log.Printf("Error reading migration: %s", lastMigration.DownPath)
 		return err
 	}
 	transaction, err := m.DB.Begin()
 	if err != nil {
+		log.Printf("Error creating transaction: %v", err)
 		return err
 	}
 	_, err = transaction.Exec(string(sql))
 	if err != nil {
 		transaction.Rollback()
+		log.Printf("Error rolling back transaction: %v", err)
 		return err
 	}
 	err = transaction.Commit()
 	if err != nil {
+		log.Printf("Error commiting transaction: %v", err)
 		return err
 	}
 	lastMigration.Status = Inactive
+	log.Print("Rolled back migration %v successfully", lastMigration.Name)
 	return nil
 }
