@@ -33,7 +33,7 @@ type Migrator struct {
 
 // Returns true if the migration table already exists.
 func (m *Migrator) MigrationTableExists() (bool, error) {
-	row := db.QueryRow(m.dbAdapter.SelectMigrationTableSql(), migrationTableName)
+	row := m.DB.QueryRow(m.dbAdapter.SelectMigrationTableSql(), migrationTableName)
 	var tableName string
 	err := row.Scan(&tableName)
 	if err == sql.ErrNoRows {
@@ -52,7 +52,7 @@ func (m *Migrator) MigrationTableExists() (bool, error) {
 func (m *Migrator) CreateMigrationsTable() error {
 	log.Print("Creating migrations table")
 
-	_, err := db.Query(m.dbAdapter.CreateMigrationTableSql())
+	_, err := m.DB.Query(m.dbAdapter.CreateMigrationTableSql())
 	if err != nil {
 		log.Fatalf("Error creating migrations table: %v", err)
 	}
