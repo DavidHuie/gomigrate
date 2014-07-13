@@ -62,3 +62,7 @@ func (m Mysql) MigrationLogInsertSql() string {
 func (m Mysql) MigrationLogDeleteSql() string {
 	return "DELETE FROM gomigrate WHERE migration_id = ?"
 }
+
+// MARIADB
+
+type Mariadb Mysql
