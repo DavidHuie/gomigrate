@@ -47,8 +47,15 @@ func NewMigrator(db *sql.DB, migrationsPath string) (*Migrator, error) {
 		make(map[uint64]*Migration),
 	}
 
-	if err := migrator.createMigrationsTable(); err != nil {
+	// Create the migrations table if it doesn't exist.
+	tableExists, err := migrator.migrationTableExists()
+	if err != nil {
 		return nil, err
+	}
+	if !tableExists {
+		if err := migrator.createMigrationsTable(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Get all metadata from the database.
@@ -98,17 +105,9 @@ CREATE TABLE gomigrate (
 
 // Creates the migrations table if it doesn't exist.
 func (m *Migrator) createMigrationsTable() error {
-	status, err := m.migrationTableExists()
-	if err != nil {
-		return err
-	}
-	if status {
-		return nil
-	}
-
 	log.Print("Creating migrations table")
 
-	_, err = m.DB.Query(createMigrationTableSql)
+	_, err := m.DB.Query(createMigrationTableSql)
 	if err != nil {
 		log.Fatalf("Error creating migrations table: %v", err)
 	}
