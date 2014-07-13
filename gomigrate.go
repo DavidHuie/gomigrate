@@ -174,7 +174,8 @@ func (m *Migrator) getMigrationStatuses() error {
 	return nil
 }
 
-// Returns a sorted list of migration ids for a given status.
+// Returns a sorted list of migration ids for a given status. -1 returns
+// all migrations.
 func (m *Migrator) Migrations(status int) []*Migration {
 	// Sort all migration ids.
 	ids := make([]uint64, 0)
@@ -187,7 +188,7 @@ func (m *Migrator) Migrations(status int) []*Migration {
 	migrations := make([]*Migration, 0)
 	for _, id := range ids {
 		migration := m.migrations[id]
-		if migration.Status == status {
+		if status == -1 || migration.Status == status {
 			migrations = append(migrations, migration)
 		}
 	}
