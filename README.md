@@ -44,7 +44,7 @@ in the same directory. Given "up" and "down" steps for a migration,
 create two files that follow this template:
 
 ```
-{{ id }}_{{ name }}_{{ "up" or "down" }}.{{ extension }}
+{{ id }}_{{ name }}_{{ "up" or "down" }}.sql
 ```
 
 For a given migration, the `id` and `name` fields must be the same.

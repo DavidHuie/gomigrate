@@ -17,8 +17,8 @@ const (
 )
 
 var (
-	upMigrationFile       = regexp.MustCompile(`(\d+)_(\w+)_up\.(\w+)`)
-	downMigrationFile     = regexp.MustCompile(`(\d+)_(\w+)_down\.(\w+)`)
+	upMigrationFile       = regexp.MustCompile(`(\d+)_(\w+)_up\.sql`)
+	downMigrationFile     = regexp.MustCompile(`(\d+)_(\w+)_down\.sql`)
 	InvalidMigrationFile  = errors.New("Invalid migration file")
 	InvalidMigrationPair  = errors.New("Invalid pair of migration files")
 	InvalidMigrationsPath = errors.New("Invalid migrations path")
