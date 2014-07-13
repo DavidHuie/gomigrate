@@ -4,4 +4,5 @@ addons:
   postgresql: "9.3"
 before_script:
   - psql -c 'create database gomigrate;' -U postgres
+  - go get github.com/lib/pq
 script: go test
