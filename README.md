@@ -2,7 +2,7 @@
 
 [![Build Status](https://travis-ci.org/DavidHuie/gomigrate.svg?branch=master)](https://travis-ci.org/DavidHuie/gomigrate)
 
-A database migration in Golang.
+A database migration toolkit in Golang.
 
 ## Supported databases
 
