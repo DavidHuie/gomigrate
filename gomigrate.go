@@ -17,8 +17,8 @@ const (
 )
 
 var (
-	upMigrationFile       = regexp.MustCompile(`(\d+)_(\w+)_up.sql`)
-	downMigrationFile     = regexp.MustCompile(`(\d+)_(\w+)_down.sql`)
+	upMigrationFile       = regexp.MustCompile(`(\d+)_(\w+)_up\.(\w+)`)
+	downMigrationFile     = regexp.MustCompile(`(\d+)_(\w+)_down\.(\w+)`)
 	InvalidMigrationFile  = errors.New("Invalid migration file")
 	InvalidMigrationPair  = errors.New("Invalid pair of migration files")
 	InvalidMigrationsPath = errors.New("Invalid migrations path")
@@ -27,11 +27,12 @@ var (
 type Migrator struct {
 	DB             *sql.DB
 	MigrationsPath string
+	dbAdapter      Migratable
 	migrations     map[uint64]*Migration
 }
 
 // Returns a new migrator.
-func NewMigrator(db *sql.DB, migrationsPath string) (*Migrator, error) {
+func NewMigrator(db *sql.DB, adapter Migratable, migrationsPath string) (*Migrator, error) {
 	// Normalize the migrations path.
 	path := []byte(migrationsPath)
 	pathLength := len(path)
@@ -44,6 +45,7 @@ func NewMigrator(db *sql.DB, migrationsPath string) (*Migrator, error) {
 	migrator := Migrator{
 		db,
 		string(path),
+		adapter,
 		make(map[uint64]*Migration),
 	}
 
@@ -53,7 +55,7 @@ func NewMigrator(db *sql.DB, migrationsPath string) (*Migrator, error) {
 		return nil, err
 	}
 	if !tableExists {
-		if err := migrator.createMigrationsTable(); err != nil {
+		if err := migrator.dbAdapter.CreateMigrationsTable(migrator.DB); err != nil {
 			return nil, err
 		}
 	}
@@ -93,28 +95,6 @@ func (m *Migrator) migrationTableExists() (bool, error) {
 	log.Print("Migrations table not found")
 
 	return false, nil
-}
-
-const createMigrationTableSql = `
-CREATE TABLE gomigrate (
-  id           SERIAL       PRIMARY KEY,
-  migration_id INT          UNIQUE NOT NULL,
-  name         VARCHAR(100) UNIQUE NOT NULL,
-  status       INT          NOT NULL
-)`
-
-// Creates the migrations table if it doesn't exist.
-func (m *Migrator) createMigrationsTable() error {
-	log.Print("Creating migrations table")
-
-	_, err := m.DB.Query(createMigrationTableSql)
-	if err != nil {
-		log.Fatalf("Error creating migrations table: %v", err)
-	}
-
-	log.Printf("Created migrations table: %s", migrationTableName)
-
-	return nil
 }
 
 // Populates a migrator with a sorted list of migrations from the file system.

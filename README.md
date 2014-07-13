@@ -2,7 +2,11 @@
 
 [![Build Status](https://travis-ci.org/DavidHuie/gomigrate.svg?branch=master)](https://travis-ci.org/DavidHuie/gomigrate)
 
-A database migration tool for Postgres in Golang.
+A database migration in Golang.
+
+## Supported databases
+
+- PostgreSQL
 
 ## Usage
 
@@ -16,7 +20,7 @@ Given a `database/sql` database connection to a PostgreSQL database, `db`,
 and a directory to migration files, create a migrator:
 
 ```go
-migrator := gomigrate.NewMigrator(db, "./migrations")
+migrator := gomigrate.NewMigrator(db, gomigrate.Postgres{}, "./migrations")
 ```
 
 To migrate the database, run:
@@ -38,7 +42,7 @@ in the same directory. Given "up" and "down" steps for a migration,
 create two files that follow this template:
 
 ```
-{{ id }}_{{ name }}_{{ "up" or "down" }}.sql
+{{ id }}_{{ name }}_{{ "up" or "down" }}.{{ extension }}
 ```
 
 For a given migration, the `id` and `name` fields must be the same.

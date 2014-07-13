@@ -12,7 +12,7 @@ var (
 )
 
 func TestNewMigrator(t *testing.T) {
-	m, err := NewMigrator(db, "test_migrations/test1")
+	m, err := NewMigrator(db, Postgres{}, "test_migrations/test1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -43,7 +43,7 @@ func TestNewMigrator(t *testing.T) {
 
 func TestCreatingMigratorWhenTableExists(t *testing.T) {
 	// Create the table and populate it with a row.
-	_, err := db.Exec(createMigrationTableSql)
+	_, err := db.Exec(pgCreateMigrationTableSql)
 	if err != nil {
 		t.Error(err)
 	}
@@ -52,7 +52,7 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 		t.Error(err)
 	}
 	// Create a migrator.
-	_, err = NewMigrator(db, "test_migrations/test1")
+	_, err = NewMigrator(db, Postgres{}, "test_migrations/test1")
 	if err != nil {
 		t.Error(err)
 	}
@@ -74,7 +74,7 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 }
 
 func TestMigrationAndRollback(t *testing.T) {
-	m, err := NewMigrator(db, "test_migrations/test1")
+	m, err := NewMigrator(db, Postgres{}, "test_migrations/test1")
 	if err != nil {
 		t.Error(err)
 	}
