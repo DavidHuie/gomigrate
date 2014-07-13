@@ -1,5 +1,7 @@
 # gomigrate
 
+[![Build Status](https://travis-ci.org/DavidHuie/gomigrate.svg?branch=master)](https://travis-ci.org/DavidHuie/gomigrate)
+
 A database migration tool for Postgres in Golang.
 
 ## Usage
