@@ -22,6 +22,7 @@ var (
 	InvalidMigrationFile  = errors.New("Invalid migration file")
 	InvalidMigrationPair  = errors.New("Invalid pair of migration files")
 	InvalidMigrationsPath = errors.New("Invalid migrations path")
+	NoActiveMigrations    = errors.New("No active migrations to rollback")
 )
 
 type Migrator struct {
@@ -250,10 +251,6 @@ func (m *Migrator) Migrate() error {
 	}
 	return nil
 }
-
-var (
-	NoActiveMigrations = errors.New("No active migrations to rollback")
-)
 
 // Rolls back the last migration
 func (m *Migrator) Rollback() error {
