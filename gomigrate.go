@@ -18,10 +18,8 @@ const (
 )
 
 var (
-	// Regexps for migration file paths.
-	upMigrationFile   = regexp.MustCompile(`(\d+)_(\w+)_up.sql`)
-	downMigrationFile = regexp.MustCompile(`(\d+)_(\w+)_down.sql`)
-
+	upMigrationFile       = regexp.MustCompile(`(\d+)_(\w+)_up.sql`)
+	downMigrationFile     = regexp.MustCompile(`(\d+)_(\w+)_down.sql`)
 	InvalidMigrationFile  = errors.New("Invalid migration file")
 	InvalidMigrationPair  = errors.New("Invalid pair of migration files")
 	InvalidMigrationsPath = errors.New("Invalid migrations path")
@@ -93,10 +91,11 @@ func (m *Migrator) migrationTableExists() (bool, error) {
 
 const createMigrationTableSql = `
 CREATE TABLE gomigrate (
-  id     SERIAL       PRIMARY KEY,
-  name   VARCHAR(100) UNIQUE NOT NULL,
-  status INT                 NOT NULL
-);`
+  id           SERIAL       PRIMARY KEY,
+  migration_id INT          NOT NULL,
+  name         VARCHAR(100) UNIQUE NOT NULL,
+  status       INT          NOT NULL
+)`
 
 // Creates the migrations table if it doesn't exist.
 func (m *Migrator) createMigrationsTable() error {
@@ -173,7 +172,7 @@ func (m *Migrator) fetchMigrations() error {
 
 		migration, ok := m.migrations[num]
 		if !ok {
-			migration = &Migration{Num: num, Name: name, Status: Inactive}
+			migration = &Migration{Id: num, Name: name, Status: Inactive}
 			m.migrations[num] = migration
 		}
 		if migrationType == "up" {
@@ -243,7 +242,7 @@ func (m *Migrator) Migrations(status int) []*Migration {
 	}
 	sort.Sort(uint64slice(ids))
 
-	// Find inactive ids.
+	// Find ids for the given status.
 	migrations := make([]*Migration, 0)
 	for _, id := range ids {
 		migration := m.migrations[id]
@@ -254,27 +253,52 @@ func (m *Migrator) Migrations(status int) []*Migration {
 	return migrations
 }
 
+const migrationLogInsertSql = `
+INSERT INTO gomigrate (migration_id, name, status) values ($1, $2, $3)
+`
+
 // Applies all inactive migrations.
 func (m *Migrator) Migrate() error {
 	for _, migration := range m.Migrations(Inactive) {
+		log.Printf("Applying migration %s", migration.Name)
+
 		sql, err := ioutil.ReadFile(migration.UpPath)
 		if err != nil {
+			log.Print("Error reading up migration %s", migration.Name)
 			return err
 		}
 		transaction, err := m.DB.Begin()
 		if err != nil {
+			log.Print("Error opening transaction")
 			return err
 		}
+		// Perform the migration.
 		_, err = transaction.Exec(string(sql))
 		if err != nil {
 			transaction.Rollback()
+			log.Printf("Migration %s failed", migration.Name)
+			return err
+		}
+		// Log the exception in the migrations table.
+		_, err = transaction.Exec(
+			migrationLogInsertSql,
+			migration.Id,
+			migration.Name,
+			migration.Status,
+		)
+		if err != nil {
+			transaction.Rollback()
+			log.Printf("Migration logging for %s failed", migration.Name)
 			return err
 		}
 		err = transaction.Commit()
 		if err != nil {
+			log.Print("Error commiting transaction")
 			return err
 		}
 		migration.Status = Active
+
+		log.Printf("Applied migration %s successfully", migration.Name)
 	}
 	return nil
 }

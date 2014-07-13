@@ -25,11 +25,11 @@ func TestNewMigrator(t *testing.T) {
 	if migration.Name != "test" {
 		t.Errorf("Invalid migration name detected: %s", migration.Name)
 	}
-	if migration.Num != 1 {
-		t.Errorf("Invalid migration num detected: %s", migration.Num)
+	if migration.Id != 1 {
+		t.Errorf("Invalid migration num detected: %s", migration.Id)
 	}
 	if migration.Status != Inactive {
-		t.Errorf("Invalid migration num detected: %s", migration.Num)
+		t.Errorf("Invalid migration num detected: %s", migration.Status)
 	}
 	if migration.UpPath != "test_migrations/test1/1_test_up.sql" {
 		t.Errorf("Invalid migration up path detected: %s", migration.UpPath)
@@ -38,6 +38,38 @@ func TestNewMigrator(t *testing.T) {
 		t.Errorf("Invalid migration down path detected: %s", migration.DownPath)
 	}
 
+	cleanup()
+}
+
+func TestCreatingMigratorWhenTableExists(t *testing.T) {
+	// Create the table and populate it with a row.
+	_, err := db.Exec(createMigrationTableSql)
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = db.Exec(migrationLogInsertSql, 123, "my_test", Active)
+	if err != nil {
+		t.Error(err)
+	}
+	// Create a migrator.
+	_, err = NewMigrator(db, "test_migrations/test1")
+	if err != nil {
+		t.Error(err)
+	}
+	// Check that our row is still present.
+	row := db.QueryRow("select name, status from gomigrate")
+	var name string
+	var status int
+	err = row.Scan(&name, &status)
+	if err != nil {
+		t.Error(err)
+	}
+	if name != "my_test" {
+		t.Error("Invalid name found in database")
+	}
+	if status != Active {
+		t.Error("Invalid status found in database")
+	}
 	cleanup()
 }
 
