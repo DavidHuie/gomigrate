@@ -65,4 +65,6 @@ func (m Mysql) MigrationLogDeleteSql() string {
 
 // MARIADB
 
-type Mariadb Mysql
+type Mariadb struct {
+	Mysql
+}

@@ -157,7 +157,7 @@ func init() {
 		}
 	} else {
 		log.Print("Using mysql")
-		adapter = Mysql{}
+		adapter = Mariadb{}
 		db, err = sql.Open("mysql", "gomigrate:password@/gomigrate")
 	}
 }
