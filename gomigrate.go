@@ -19,8 +19,8 @@ const (
 
 var (
 	// Regexps for migration file paths.
-	upMigrationFile   = regexp.MustCompile(`(\d+)_(\w+)_down.sql`)
-	downMigrationFile = regexp.MustCompile(`(\d+)_(\w+)_up.sql`)
+	upMigrationFile   = regexp.MustCompile(`(\d+)_(\w+)_up.sql`)
+	downMigrationFile = regexp.MustCompile(`(\d+)_(\w+)_down.sql`)
 
 	InvalidMigrationFile  = errors.New("Invalid migration file")
 	InvalidMigrationPair  = errors.New("Invalid pair of migration files")
@@ -173,7 +173,7 @@ func (m *Migrator) fetchMigrations() error {
 
 		migration, ok := m.migrations[num]
 		if !ok {
-			migration = &Migration{Num: num, Name: name, Status: inactive}
+			migration = &Migration{Num: num, Name: name, Status: Inactive}
 			m.migrations[num] = migration
 		}
 		if migrationType == "up" {
@@ -256,7 +256,7 @@ func (m *Migrator) Migrations(status int) []*Migration {
 
 // Applies all inactive migrations.
 func (m *Migrator) Migrate() error {
-	for _, migration := range m.Migrations(inactive) {
+	for _, migration := range m.Migrations(Inactive) {
 		sql, err := ioutil.ReadFile(migration.UpPath)
 		if err != nil {
 			return err
@@ -274,14 +274,14 @@ func (m *Migrator) Migrate() error {
 		if err != nil {
 			return err
 		}
-		migration.Status = active
+		migration.Status = Active
 	}
 	return nil
 }
 
 // Rolls back the last migration
 func (m *Migrator) Rollback() error {
-	migrations := m.Migrations(active)
+	migrations := m.Migrations(Active)
 	lastMigration := migrations[len(migrations)-1]
 	sql, err := ioutil.ReadFile(lastMigration.DownPath)
 	if err != nil {
@@ -300,6 +300,6 @@ func (m *Migrator) Rollback() error {
 	if err != nil {
 		return err
 	}
-	lastMigration.Status = inactive
+	lastMigration.Status = Inactive
 	return nil
 }

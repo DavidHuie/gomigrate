@@ -4,8 +4,8 @@ package gomigrate
 
 // Migration statuses.
 const (
-	inactive = iota
-	active
+	Inactive = iota
+	Active
 )
 
 // Holds configuration information for a given migration.
