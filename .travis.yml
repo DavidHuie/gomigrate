@@ -4,5 +4,11 @@ addons:
   postgresql: "9.3"
 before_script:
   - psql -c 'create database gomigrate;' -U postgres
+  - mysql -uroot "CREATE USER 'gomigrate'@'localhost' IDENTIFIED BY 'password';"
+  - mysql -uroot "GRANT ALL PRIVILEGES ON * . * TO 'gomigrate'@'localhost';"
+  - mysql -uroot "CREATE DATABASE gomigrate;"
   - go get github.com/lib/pq
-script: go test
+  - go get github.com/go-sql-driver/mysql
+script:
+  - DB=pg go test
+  - DB=mysql go test

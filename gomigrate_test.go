@@ -2,20 +2,37 @@ package gomigrate
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
+	"os"
 	"testing"
 
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
 )
 
 var (
-	db *sql.DB
+	db      *sql.DB
+	adapter Migratable
 )
 
-func TestNewMigrator(t *testing.T) {
-	m, err := NewMigrator(db, Postgres{}, "test_migrations/test1")
-	if err != nil {
-		t.Error(err)
+func GetMigrator(test string) *Migrator {
+	var suffix string
+	if os.Getenv("DB") == "pg" {
+		suffix = "pg"
+	} else {
+		suffix = "mysql"
 	}
+	path := fmt.Sprintf("test_migrations/%s_%s", test, suffix)
+	m, err := NewMigrator(db, adapter, path)
+	if err != nil {
+		panic(err)
+	}
+	return m
+}
+
+func TestNewMigrator(t *testing.T) {
+	m := GetMigrator("test1")
 	if len(m.migrations) != 1 {
 		t.Errorf("Invalid number of migrations detected")
 	}
@@ -31,31 +48,23 @@ func TestNewMigrator(t *testing.T) {
 	if migration.Status != Inactive {
 		t.Errorf("Invalid migration num detected: %s", migration.Status)
 	}
-	if migration.UpPath != "test_migrations/test1/1_test_up.sql" {
-		t.Errorf("Invalid migration up path detected: %s", migration.UpPath)
-	}
-	if migration.DownPath != "test_migrations/test1/1_test_down.sql" {
-		t.Errorf("Invalid migration down path detected: %s", migration.DownPath)
-	}
 
 	cleanup()
 }
 
 func TestCreatingMigratorWhenTableExists(t *testing.T) {
 	// Create the table and populate it with a row.
-	_, err := db.Exec(pgCreateMigrationTableSql)
+	_, err := db.Exec(adapter.CreateMigrationTableSql())
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = db.Exec(migrationLogInsertSql, 123, "my_test", Active)
+	_, err = db.Exec(adapter.MigrationLogInsertSql(), 123, "my_test", Active)
 	if err != nil {
 		t.Error(err)
 	}
-	// Create a migrator.
-	_, err = NewMigrator(db, Postgres{}, "test_migrations/test1")
-	if err != nil {
-		t.Error(err)
-	}
+
+	GetMigrator("test1")
+
 	// Check that our row is still present.
 	row := db.QueryRow("select name, status from gomigrate")
 	var name string
@@ -74,10 +83,7 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 }
 
 func TestMigrationAndRollback(t *testing.T) {
-	m, err := NewMigrator(db, Postgres{}, "test_migrations/test1")
-	if err != nil {
-		t.Error(err)
-	}
+	m := GetMigrator("test1")
 
 	if err := m.Migrate(); err != nil {
 		t.Error(err)
@@ -85,7 +91,7 @@ func TestMigrationAndRollback(t *testing.T) {
 
 	// Ensure that the migration ran.
 	row := db.QueryRow(
-		"SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1",
+		adapter.SelectMigrationTableSql(),
 		"test",
 	)
 	var tableName string
@@ -97,8 +103,8 @@ func TestMigrationAndRollback(t *testing.T) {
 	}
 	// Ensure that the migrate status is correct.
 	row = db.QueryRow(
-		"SELECT status FROM gomigrate where migration_id = $1",
-		1,
+		adapter.MigrationStatusSql(),
+		"test",
 	)
 	var status int
 	if err := row.Scan(&status); err != nil {
@@ -114,24 +120,24 @@ func TestMigrationAndRollback(t *testing.T) {
 
 	// Ensure that the down migration ran.
 	row = db.QueryRow(
-		"SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1",
+		adapter.SelectMigrationTableSql(),
 		"test",
 	)
-	err = row.Scan(&tableName)
+	err := row.Scan(&tableName)
 	if err != sql.ErrNoRows {
 		t.Errorf("Migration table should be deleted")
 	}
 
 	// Ensure that the migrate status is correct.
 	row = db.QueryRow(
-		"SELECT status FROM gomigrate where migration_id = $1",
-		1,
+		adapter.MigrationStatusSql(),
+		"test",
 	)
 	if err := row.Scan(&status); err != nil {
 		t.Error(err)
 	}
 	if status != Inactive || m.migrations[1].Status != Inactive {
-		t.Error("Invalid status for migration")
+		t.Errorf("Invalid status for migration, %v", status)
 	}
 
 	cleanup()
@@ -146,8 +152,16 @@ func cleanup() {
 
 func init() {
 	var err error
-	db, err = sql.Open("postgres", "host=localhost dbname=gomigrate sslmode=disable")
-	if err != nil {
-		panic(err)
+	if os.Getenv("DB") == "pg" {
+		log.Print("Using postgres")
+		adapter = Postgres{}
+		db, err = sql.Open("postgres", "host=localhost dbname=gomigrate sslmode=disable")
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		log.Print("Using mysql")
+		adapter = Mysql{}
+		db, err = sql.Open("mysql", "gomigrate:password@/gomigrate")
 	}
 }

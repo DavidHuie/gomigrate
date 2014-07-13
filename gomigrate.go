@@ -31,6 +31,37 @@ type Migrator struct {
 	migrations     map[uint64]*Migration
 }
 
+// Returns true if the migration table already exists.
+func (m *Migrator) MigrationTableExists() (bool, error) {
+	row := db.QueryRow(m.dbAdapter.SelectMigrationTableSql(), migrationTableName)
+	var tableName string
+	err := row.Scan(&tableName)
+	if err == sql.ErrNoRows {
+		log.Print("Migrations table not found")
+		return false, nil
+	}
+	if err != nil {
+		log.Printf("Error checking for migration table: %v", err)
+		return false, err
+	}
+	log.Print("Migrations table found")
+	return true, nil
+}
+
+// Creates the migrations table if it doesn't exist.
+func (m *Migrator) CreateMigrationsTable() error {
+	log.Print("Creating migrations table")
+
+	_, err := db.Query(m.dbAdapter.CreateMigrationTableSql())
+	if err != nil {
+		log.Fatalf("Error creating migrations table: %v", err)
+	}
+
+	log.Printf("Created migrations table: %s", migrationTableName)
+
+	return nil
+}
+
 // Returns a new migrator.
 func NewMigrator(db *sql.DB, adapter Migratable, migrationsPath string) (*Migrator, error) {
 	// Normalize the migrations path.
@@ -50,12 +81,12 @@ func NewMigrator(db *sql.DB, adapter Migratable, migrationsPath string) (*Migrat
 	}
 
 	// Create the migrations table if it doesn't exist.
-	tableExists, err := migrator.migrationTableExists()
+	tableExists, err := migrator.MigrationTableExists()
 	if err != nil {
 		return nil, err
 	}
 	if !tableExists {
-		if err := migrator.dbAdapter.CreateMigrationsTable(migrator.DB); err != nil {
+		if err := migrator.CreateMigrationsTable(); err != nil {
 			return nil, err
 		}
 	}
@@ -69,32 +100,6 @@ func NewMigrator(db *sql.DB, adapter Migratable, migrationsPath string) (*Migrat
 	}
 
 	return &migrator, nil
-}
-
-const selectTablesSql = "SELECT tablename FROM pg_catalog.pg_tables"
-
-// Returns true if the migration table already exists.
-func (m *Migrator) migrationTableExists() (bool, error) {
-	rows, err := m.DB.Query(selectTablesSql)
-	if err != nil {
-		log.Printf("Error checking for migration table: %v", err)
-		return false, err
-	}
-	for rows.Next() {
-		var tableName string
-		err := rows.Scan(&tableName)
-		if err != nil {
-			return false, err
-		}
-		if tableName == migrationTableName {
-			log.Printf("Found migrations table: %v", tableName)
-			return true, nil
-		}
-	}
-
-	log.Print("Migrations table not found")
-
-	return false, nil
 }
 
 // Populates a migrator with a sorted list of migrations from the file system.
@@ -146,13 +151,11 @@ func (m *Migrator) fetchMigrations() error {
 	return nil
 }
 
-const migrationStatusSql = "SELECT status FROM gomigrate WHERE name = $1"
-
 // Queries the migration table to determine the status of each
 // migration.
 func (m *Migrator) getMigrationStatuses() error {
 	for _, migration := range m.migrations {
-		rows, err := m.DB.Query(migrationStatusSql, migration.Name)
+		rows, err := m.DB.Query(m.dbAdapter.MigrationStatusSql(), migration.Name)
 		if err != nil {
 			log.Printf(
 				"Error getting migration status for %s: %v",
@@ -199,10 +202,6 @@ func (m *Migrator) Migrations(status int) []*Migration {
 	return migrations
 }
 
-const migrationLogInsertSql = `
-INSERT INTO gomigrate (migration_id, name, status) values ($1, $2, $3)
-`
-
 // Applies all inactive migrations.
 func (m *Migrator) Migrate() error {
 	for _, migration := range m.Migrations(Inactive) {
@@ -229,7 +228,7 @@ func (m *Migrator) Migrate() error {
 		}
 		// Log the exception in the migrations table.
 		_, err = transaction.Exec(
-			migrationLogInsertSql,
+			m.dbAdapter.MigrationLogInsertSql(),
 			migration.Id,
 			migration.Name,
 			Active,
@@ -256,10 +255,6 @@ func (m *Migrator) Migrate() error {
 
 var (
 	NoActiveMigrations = errors.New("No active migrations to rollback")
-)
-
-const (
-	migrationLogUpdateSql = "UPDATE gomigrate SET status = $1 WHERE migration_id = $2"
 )
 
 // Rolls back the last migration
@@ -293,7 +288,7 @@ func (m *Migrator) Rollback() error {
 
 	// Change the status in the migrations table.
 	_, err = transaction.Exec(
-		migrationLogUpdateSql,
+		m.dbAdapter.MigrationLogUpdateSql(),
 		Inactive,
 		lastMigration.Id,
 	)

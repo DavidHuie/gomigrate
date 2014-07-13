@@ -1,34 +1,68 @@
 package gomigrate
 
-import (
-	"database/sql"
-	"log"
-)
-
 type Migratable interface {
-	CreateMigrationsTable(*sql.DB) error
+	SelectMigrationTableSql() string
+	CreateMigrationTableSql() string
+	MigrationStatusSql() string
+	MigrationLogInsertSql() string
+	MigrationLogUpdateSql() string
 }
+
+// POSTGRESQL
 
 type Postgres struct{}
 
-const pgCreateMigrationTableSql = `
-CREATE TABLE gomigrate (
-  id           SERIAL       PRIMARY KEY,
-  migration_id INT          UNIQUE NOT NULL,
-  name         VARCHAR(100) UNIQUE NOT NULL,
-  status       INT          NOT NULL
-)`
+func (p Postgres) SelectMigrationTableSql() string {
+	return "SELECT tablename FROM pg_catalog.pg_tables WHERE tablename = $1"
+}
 
-// Creates the migrations table if it doesn't exist.
-func (m Postgres) CreateMigrationsTable(db *sql.DB) error {
-	log.Print("Creating migrations table")
+func (p Postgres) CreateMigrationTableSql() string {
+	return `CREATE TABLE gomigrate (
+                  id           SERIAL       PRIMARY KEY,
+                  migration_id INT          UNIQUE NOT NULL,
+                  name         VARCHAR(100) UNIQUE NOT NULL,
+                  status       INT          NOT NULL
+                )`
+}
 
-	_, err := db.Query(pgCreateMigrationTableSql)
-	if err != nil {
-		log.Fatalf("Error creating migrations table: %v", err)
-	}
+func (p Postgres) MigrationStatusSql() string {
+	return "SELECT status FROM gomigrate WHERE name = $1"
+}
 
-	log.Printf("Created migrations table: %s", migrationTableName)
+func (p Postgres) MigrationLogInsertSql() string {
+	return "INSERT INTO gomigrate (migration_id, name, status) values ($1, $2, $3)"
+}
 
-	return nil
+func (p Postgres) MigrationLogUpdateSql() string {
+	return "UPDATE gomigrate SET status = $1 WHERE migration_id = $2"
+}
+
+// MYSQL
+
+type Mysql struct{}
+
+func (m Mysql) SelectMigrationTableSql() string {
+	return "SELECT table_name FROM information_schema.tables WHERE table_name = ?"
+}
+
+func (m Mysql) CreateMigrationTableSql() string {
+	return `CREATE TABLE gomigrate (
+                  id           INT          NOT NULL AUTO_INCREMENT,
+                  migration_id INT          NOT NULL UNIQUE,
+                  name         VARCHAR(100) NOT NULL UNIQUE,
+                  status       INT          NOT NULL,
+                  PRIMARY KEY (id)
+                ) ENGINE=MyISAM`
+}
+
+func (m Mysql) MigrationStatusSql() string {
+	return "SELECT status FROM gomigrate WHERE name = ?"
+}
+
+func (m Mysql) MigrationLogInsertSql() string {
+	return "INSERT INTO gomigrate (migration_id, name, status) values (?, ?, ?)"
+}
+
+func (m Mysql) MigrationLogUpdateSql() string {
+	return "UPDATE gomigrate SET status = ? WHERE migration_id = ?"
 }

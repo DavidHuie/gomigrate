@@ -7,6 +7,8 @@ A SQL database migration toolkit in Golang.
 ## Supported databases
 
 - PostgreSQL
+- MariaDB
+- MySQL
 
 ## Usage
 
