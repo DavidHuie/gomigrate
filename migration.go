@@ -11,12 +11,10 @@ const (
 // Holds configuration information for a given migration.
 type Migration struct {
 	DownPath string
+	Id       uint64
 	Name     string
 	Status   int
 	UpPath   string
-
-	// The file system identifier, not the database id.
-	Id uint64
 }
 
 // Performs a basic validation of a migration.

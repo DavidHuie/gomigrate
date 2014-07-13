@@ -58,7 +58,7 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = db.Exec(adapter.MigrationLogInsertSql(), 123, "my_test", Active)
+	_, err = db.Exec(adapter.MigrationLogInsertSql(), 123)
 	if err != nil {
 		t.Error(err)
 	}
@@ -66,18 +66,14 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 	GetMigrator("test1")
 
 	// Check that our row is still present.
-	row := db.QueryRow("select name, status from gomigrate")
-	var name string
-	var status int
-	err = row.Scan(&name, &status)
+	row := db.QueryRow("select migration_id from gomigrate")
+	var id uint64
+	err = row.Scan(&id)
 	if err != nil {
 		t.Error(err)
 	}
-	if name != "my_test" {
-		t.Error("Invalid name found in database")
-	}
-	if status != Active {
-		t.Error("Invalid status found in database")
+	if id != 123 {
+		t.Error("Invalid id found in database")
 	}
 	cleanup()
 }
@@ -103,8 +99,8 @@ func TestMigrationAndRollback(t *testing.T) {
 	}
 	// Ensure that the migrate status is correct.
 	row = db.QueryRow(
-		adapter.MigrationStatusSql(),
-		"test",
+		adapter.GetMigrationSql(),
+		1,
 	)
 	var status int
 	if err := row.Scan(&status); err != nil {
@@ -128,16 +124,16 @@ func TestMigrationAndRollback(t *testing.T) {
 		t.Errorf("Migration table should be deleted")
 	}
 
-	// Ensure that the migrate status is correct.
+	// Ensure that the migration log is missing.
 	row = db.QueryRow(
-		adapter.MigrationStatusSql(),
-		"test",
+		adapter.GetMigrationSql(),
+		1,
 	)
-	if err := row.Scan(&status); err != nil {
+	if err := row.Scan(&status); err != sql.ErrNoRows {
 		t.Error(err)
 	}
-	if status != Inactive || m.migrations[1].Status != Inactive {
-		t.Errorf("Invalid status for migration, %v", status)
+	if m.migrations[1].Status != Inactive {
+		t.Errorf("Invalid status for migration, %v", m.migrations[1].Status)
 	}
 
 	cleanup()

@@ -3,12 +3,12 @@ package gomigrate
 type Migratable interface {
 	SelectMigrationTableSql() string
 	CreateMigrationTableSql() string
-	MigrationStatusSql() string
+	GetMigrationSql() string
 	MigrationLogInsertSql() string
-	MigrationLogUpdateSql() string
+	MigrationLogDeleteSql() string
 }
 
-// POSTGRESQL
+// POSTGRES
 
 type Postgres struct{}
 
@@ -19,22 +19,20 @@ func (p Postgres) SelectMigrationTableSql() string {
 func (p Postgres) CreateMigrationTableSql() string {
 	return `CREATE TABLE gomigrate (
                   id           SERIAL       PRIMARY KEY,
-                  migration_id INT          UNIQUE NOT NULL,
-                  name         VARCHAR(100) UNIQUE NOT NULL,
-                  status       INT          NOT NULL
+                  migration_id BIGINT       UNIQUE NOT NULL
                 )`
 }
 
-func (p Postgres) MigrationStatusSql() string {
-	return "SELECT status FROM gomigrate WHERE name = $1"
+func (p Postgres) GetMigrationSql() string {
+	return `SELECT migration_id FROM gomigrate WHERE migration_id = $1`
 }
 
 func (p Postgres) MigrationLogInsertSql() string {
-	return "INSERT INTO gomigrate (migration_id, name, status) values ($1, $2, $3)"
+	return "INSERT INTO gomigrate (migration_id) values ($1)"
 }
 
-func (p Postgres) MigrationLogUpdateSql() string {
-	return "UPDATE gomigrate SET status = $1 WHERE migration_id = $2"
+func (p Postgres) MigrationLogDeleteSql() string {
+	return "DELETE FROM gomigrate WHERE migration_id = $1"
 }
 
 // MYSQL
@@ -48,21 +46,19 @@ func (m Mysql) SelectMigrationTableSql() string {
 func (m Mysql) CreateMigrationTableSql() string {
 	return `CREATE TABLE gomigrate (
                   id           INT          NOT NULL AUTO_INCREMENT,
-                  migration_id INT          NOT NULL UNIQUE,
-                  name         VARCHAR(100) NOT NULL UNIQUE,
-                  status       INT          NOT NULL,
+                  migration_id BIGINT       NOT NULL UNIQUE,
                   PRIMARY KEY (id)
                 ) ENGINE=MyISAM`
 }
 
-func (m Mysql) MigrationStatusSql() string {
-	return "SELECT status FROM gomigrate WHERE name = ?"
+func (m Mysql) GetMigrationSql() string {
+	return `SELECT migration_id FROM gomigrate WHERE migration_id = ?`
 }
 
 func (m Mysql) MigrationLogInsertSql() string {
-	return "INSERT INTO gomigrate (migration_id, name, status) values (?, ?, ?)"
+	return "INSERT INTO gomigrate (migration_id) values (?)"
 }
 
-func (m Mysql) MigrationLogUpdateSql() string {
-	return "UPDATE gomigrate SET status = ? WHERE migration_id = ?"
+func (m Mysql) MigrationLogDeleteSql() string {
+	return "DELETE FROM gomigrate WHERE migration_id = ?"
 }

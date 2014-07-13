@@ -155,7 +155,12 @@ func (m *Migrator) fetchMigrations() error {
 // migration.
 func (m *Migrator) getMigrationStatuses() error {
 	for _, migration := range m.migrations {
-		rows, err := m.DB.Query(m.dbAdapter.MigrationStatusSql(), migration.Name)
+		row := m.DB.QueryRow(m.dbAdapter.GetMigrationSql(), migration.Id)
+		var mid uint64
+		err := row.Scan(&mid)
+		if err == sql.ErrNoRows {
+			continue
+		}
 		if err != nil {
 			log.Printf(
 				"Error getting migration status for %s: %v",
@@ -164,20 +169,7 @@ func (m *Migrator) getMigrationStatuses() error {
 			)
 			return err
 		}
-		for rows.Next() {
-			var status int
-			err := rows.Scan(&status)
-			if err != nil {
-				log.Printf("Error getting migration status: %v", err)
-				return err
-			}
-			migration.Status = status
-			log.Printf(
-				"Migration %s found with status: %v",
-				migration.Name,
-				status,
-			)
-		}
+		migration.Status = Active
 	}
 	return nil
 }
@@ -230,8 +222,6 @@ func (m *Migrator) Migrate() error {
 		_, err = transaction.Exec(
 			m.dbAdapter.MigrationLogInsertSql(),
 			migration.Id,
-			migration.Name,
-			Active,
 		)
 		if err != nil {
 			log.Printf("Error logging migration: %v", err)
@@ -288,8 +278,7 @@ func (m *Migrator) Rollback() error {
 
 	// Change the status in the migrations table.
 	_, err = transaction.Exec(
-		m.dbAdapter.MigrationLogUpdateSql(),
-		Inactive,
+		m.dbAdapter.MigrationLogDeleteSql(),
 		lastMigration.Id,
 	)
 	if err != nil {
