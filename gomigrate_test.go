@@ -95,6 +95,18 @@ func TestMigrationAndRollback(t *testing.T) {
 	if tableName != "test" {
 		t.Errorf("Migration table not created")
 	}
+	// Ensure that the migrate status is correct.
+	row = db.QueryRow(
+		"SELECT status FROM gomigrate where migration_id = $1",
+		1,
+	)
+	var status int
+	if err := row.Scan(&status); err != nil {
+		t.Error(err)
+	}
+	if status != Active || m.migrations[1].Status != Active {
+		t.Error("Invalid status for migration")
+	}
 
 	if err := m.Rollback(); err != nil {
 		t.Error(err)
@@ -108,6 +120,18 @@ func TestMigrationAndRollback(t *testing.T) {
 	err = row.Scan(&tableName)
 	if err != sql.ErrNoRows {
 		t.Errorf("Migration table should be deleted")
+	}
+
+	// Ensure that the migrate status is correct.
+	row = db.QueryRow(
+		"SELECT status FROM gomigrate where migration_id = $1",
+		1,
+	)
+	if err := row.Scan(&status); err != nil {
+		t.Error(err)
+	}
+	if status != Inactive || m.migrations[1].Status != Inactive {
+		t.Error("Invalid status for migration")
 	}
 
 	cleanup()

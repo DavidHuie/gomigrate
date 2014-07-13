@@ -92,7 +92,7 @@ func (m *Migrator) migrationTableExists() (bool, error) {
 const createMigrationTableSql = `
 CREATE TABLE gomigrate (
   id           SERIAL       PRIMARY KEY,
-  migration_id INT          NOT NULL,
+  migration_id INT          UNIQUE NOT NULL,
   name         VARCHAR(100) UNIQUE NOT NULL,
   status       INT          NOT NULL
 )`
@@ -285,7 +285,7 @@ func (m *Migrator) Migrate() error {
 			migrationLogInsertSql,
 			migration.Id,
 			migration.Name,
-			migration.Status,
+			Active,
 		)
 		if err != nil {
 			log.Printf("Error logging migration: %v", err)
@@ -299,6 +299,9 @@ func (m *Migrator) Migrate() error {
 			log.Printf("Error commiting transaction: %v", err)
 			return err
 		}
+
+		// Do this as the last step to ensure that the database has
+		// been updated.
 		migration.Status = Active
 	}
 	return nil
@@ -306,6 +309,10 @@ func (m *Migrator) Migrate() error {
 
 var (
 	NoActiveMigrations = errors.New("No active migrations to rollback")
+)
+
+const (
+	migrationLogUpdateSql = "UPDATE gomigrate SET status = $1 WHERE migration_id = $2"
 )
 
 // Rolls back the last migration
@@ -336,6 +343,22 @@ func (m *Migrator) Rollback() error {
 		log.Printf("Error rolling back transaction: %v", err)
 		return err
 	}
+
+	// Change the status in the migrations table.
+	_, err = transaction.Exec(
+		migrationLogUpdateSql,
+		Inactive,
+		lastMigration.Id,
+	)
+	if err != nil {
+		log.Printf("Error logging rollback: %v", err)
+		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+			log.Printf("Error rolling back transaction: %v", rollbackErr)
+			return rollbackErr
+		}
+		return err
+	}
+
 	err = transaction.Commit()
 	if err != nil {
 		log.Printf("Error commiting transaction: %v", err)
