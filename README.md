@@ -41,7 +41,7 @@ err := migrator.Rollback()
 
 Migration files need to follow a standard format and must be present
 in the same directory. Given "up" and "down" steps for a migration,
-create two files that follow this template:
+create a file for each by following this template:
 
 ```
 {{ id }}_{{ name }}_{{ "up" or "down" }}.sql
