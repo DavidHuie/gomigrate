@@ -51,8 +51,6 @@ func (m *Migrator) MigrationTableExists() (bool, error) {
 
 // Creates the migrations table if it doesn't exist.
 func (m *Migrator) CreateMigrationsTable() error {
-	log.Print("Creating migrations table")
-
 	_, err := m.DB.Query(m.dbAdapter.CreateMigrationTableSql())
 	if err != nil {
 		log.Fatalf("Error creating migrations table: %v", err)
@@ -106,8 +104,6 @@ func NewMigrator(db *sql.DB, adapter Migratable, migrationsPath string) (*Migrat
 // Populates a migrator with a sorted list of migrations from the file system.
 func (m *Migrator) fetchMigrations() error {
 	pathGlob := append([]byte(m.MigrationsPath), []byte("*")...)
-
-	log.Printf("Migrations path glob: %s", pathGlob)
 
 	matches, err := filepath.Glob(string(pathGlob))
 	if err != nil {
