@@ -8,20 +8,22 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
-	"regexp"
 	"sort"
 )
 
+type migrationType string
+
 const (
 	migrationTableName = "gomigrate"
+	upMigration        = migrationType("up")
+	downMigration      = migrationType("down")
 )
 
 var (
-	upMigrationFile       = regexp.MustCompile(`(\d+)_(\w+)_up\.sql`)
-	downMigrationFile     = regexp.MustCompile(`(\d+)_(\w+)_down\.sql`)
 	InvalidMigrationFile  = errors.New("Invalid migration file")
 	InvalidMigrationPair  = errors.New("Invalid pair of migration files")
 	InvalidMigrationsPath = errors.New("Invalid migrations path")
+	InvalidMigrationType  = errors.New("Invalid migration type")
 	NoActiveMigrations    = errors.New("No active migrations to rollback")
 )
 
@@ -124,7 +126,7 @@ func (m *Migrator) fetchMigrations() error {
 			migration = &Migration{Id: num, Name: name, Status: Inactive}
 			m.migrations[num] = migration
 		}
-		if migrationType == "up" {
+		if migrationType == upMigration {
 			migration.UpPath = match
 		} else {
 			migration.DownPath = match
@@ -193,12 +195,21 @@ func (m *Migrator) Migrations(status int) []*Migration {
 }
 
 // Applies a single migration.
-func (m *Migrator) ApplyMigration(migration *Migration) error {
-	log.Printf("Applying migration: %s", migration.Name)
+func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) error {
+	var path string
+	if mType == upMigration {
+		path = migration.UpPath
+	} else if mType == downMigration {
+		path = migration.DownPath
+	} else {
+		return InvalidMigrationType
+	}
 
-	sql, err := ioutil.ReadFile(migration.UpPath)
+	log.Printf("Applying migration: %s", path)
+
+	sql, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Printf("Error reading up migration: %s", migration.Name)
+		log.Printf("Error reading migration: %s", path)
 		return err
 	}
 	transaction, err := m.DB.Begin()
@@ -206,6 +217,7 @@ func (m *Migrator) ApplyMigration(migration *Migration) error {
 		log.Printf("Error opening transaction: %v", err)
 		return err
 	}
+
 	// Perform the migration.
 	if _, err = transaction.Exec(string(sql)); err != nil {
 		log.Printf("Error executing migration: %v", err)
@@ -215,11 +227,19 @@ func (m *Migrator) ApplyMigration(migration *Migration) error {
 		}
 		return err
 	}
-	// Log the exception in the migrations table.
-	_, err = transaction.Exec(
-		m.dbAdapter.MigrationLogInsertSql(),
-		migration.Id,
-	)
+
+	// Log the event.
+	if mType == upMigration {
+		_, err = transaction.Exec(
+			m.dbAdapter.MigrationLogInsertSql(),
+			migration.Id,
+		)
+	} else {
+		_, err = transaction.Exec(
+			m.dbAdapter.MigrationLogDeleteSql(),
+			migration.Id,
+		)
+	}
 	if err != nil {
 		log.Printf("Error logging migration: %v", err)
 		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
@@ -228,14 +248,17 @@ func (m *Migrator) ApplyMigration(migration *Migration) error {
 		}
 		return err
 	}
+
+	// Commit and update the struct status.
 	if err := transaction.Commit(); err != nil {
 		log.Printf("Error commiting transaction: %v", err)
 		return err
 	}
-
-	// Do this as the last step to ensure that the database has
-	// been updated.
-	migration.Status = Active
+	if mType == upMigration {
+		migration.Status = Active
+	} else {
+		migration.Status = Inactive
+	}
 
 	return nil
 }
@@ -243,59 +266,22 @@ func (m *Migrator) ApplyMigration(migration *Migration) error {
 // Applies all inactive migrations.
 func (m *Migrator) Migrate() error {
 	for _, migration := range m.Migrations(Inactive) {
-		m.ApplyMigration(migration)
+		if err := m.ApplyMigration(migration, upMigration); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-// Rolls back the last migration
+// Rolls back the last migration.
 func (m *Migrator) Rollback() error {
 	migrations := m.Migrations(Active)
-
 	if len(migrations) == 0 {
 		return NoActiveMigrations
 	}
-
 	lastMigration := migrations[len(migrations)-1]
-
-	log.Printf("Rolling back migration: %v", lastMigration.Name)
-
-	sql, err := ioutil.ReadFile(lastMigration.DownPath)
-	if err != nil {
-		log.Printf("Error reading migration: %s", lastMigration.DownPath)
+	if err := m.ApplyMigration(lastMigration, downMigration); err != nil {
 		return err
 	}
-	transaction, err := m.DB.Begin()
-	if err != nil {
-		log.Printf("Error creating transaction: %v", err)
-		return err
-	}
-	_, err = transaction.Exec(string(sql))
-	if err != nil {
-		transaction.Rollback()
-		log.Printf("Error rolling back transaction: %v", err)
-		return err
-	}
-
-	// Change the status in the migrations table.
-	_, err = transaction.Exec(
-		m.dbAdapter.MigrationLogDeleteSql(),
-		lastMigration.Id,
-	)
-	if err != nil {
-		log.Printf("Error logging rollback: %v", err)
-		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-			log.Printf("Error rolling back transaction: %v", rollbackErr)
-			return rollbackErr
-		}
-		return err
-	}
-
-	err = transaction.Commit()
-	if err != nil {
-		log.Printf("Error commiting transaction: %v", err)
-		return err
-	}
-	lastMigration.Status = Inactive
 	return nil
 }
