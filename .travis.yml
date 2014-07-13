@@ -1,0 +1,7 @@
+language: go
+go: 1.3
+addons:
+  postgresql: "9.3"
+before_script:
+  - psql -c 'create database gomigrate;' -U postgres
+script: go test
