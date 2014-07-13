@@ -194,51 +194,58 @@ func (m *Migrator) Migrations(status int) []*Migration {
 	return migrations
 }
 
+// Applies a single migration.
+func (m *Migrator) ApplyMigration(migration *Migration) error {
+	log.Printf("Applying migration: %s", migration.Name)
+
+	sql, err := ioutil.ReadFile(migration.UpPath)
+	if err != nil {
+		log.Printf("Error reading up migration: %s", migration.Name)
+		return err
+	}
+	transaction, err := m.DB.Begin()
+	if err != nil {
+		log.Printf("Error opening transaction: %v", err)
+		return err
+	}
+	// Perform the migration.
+	if _, err = transaction.Exec(string(sql)); err != nil {
+		log.Printf("Error executing migration: %v", err)
+		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+			log.Printf("Error rolling back transaction: %v", rollbackErr)
+			return rollbackErr
+		}
+		return err
+	}
+	// Log the exception in the migrations table.
+	_, err = transaction.Exec(
+		m.dbAdapter.MigrationLogInsertSql(),
+		migration.Id,
+	)
+	if err != nil {
+		log.Printf("Error logging migration: %v", err)
+		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+			log.Printf("Error rolling back transaction: %v", rollbackErr)
+			return rollbackErr
+		}
+		return err
+	}
+	if err := transaction.Commit(); err != nil {
+		log.Printf("Error commiting transaction: %v", err)
+		return err
+	}
+
+	// Do this as the last step to ensure that the database has
+	// been updated.
+	migration.Status = Active
+
+	return nil
+}
+
 // Applies all inactive migrations.
 func (m *Migrator) Migrate() error {
 	for _, migration := range m.Migrations(Inactive) {
-		log.Printf("Applying migration: %s", migration.Name)
-
-		sql, err := ioutil.ReadFile(migration.UpPath)
-		if err != nil {
-			log.Printf("Error reading up migration: %s", migration.Name)
-			return err
-		}
-		transaction, err := m.DB.Begin()
-		if err != nil {
-			log.Printf("Error opening transaction: %v", err)
-			return err
-		}
-		// Perform the migration.
-		if _, err = transaction.Exec(string(sql)); err != nil {
-			log.Printf("Error executing migration: %v", err)
-			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-				log.Printf("Error rolling back transaction: %v", rollbackErr)
-				return rollbackErr
-			}
-			return err
-		}
-		// Log the exception in the migrations table.
-		_, err = transaction.Exec(
-			m.dbAdapter.MigrationLogInsertSql(),
-			migration.Id,
-		)
-		if err != nil {
-			log.Printf("Error logging migration: %v", err)
-			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-				log.Printf("Error rolling back transaction: %v", rollbackErr)
-				return rollbackErr
-			}
-			return err
-		}
-		if err := transaction.Commit(); err != nil {
-			log.Printf("Error commiting transaction: %v", err)
-			return err
-		}
-
-		// Do this as the last step to ensure that the database has
-		// been updated.
-		migration.Status = Active
+		m.ApplyMigration(migration)
 	}
 	return nil
 }
