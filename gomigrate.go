@@ -219,13 +219,20 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 	}
 
 	// Perform the migration.
-	if _, err = transaction.Exec(string(sql)); err != nil {
+	result, err := transaction.Exec(string(sql))
+	if err != nil {
 		log.Printf("Error executing migration: %v", err)
 		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
 			log.Printf("Error rolling back transaction: %v", rollbackErr)
 			return rollbackErr
 		}
 		return err
+	}
+	if rowsAffected, err := result.RowsAffected(); err != nil {
+		log.Printf("Error getting rows affected: %v", err)
+		return err
+	} else {
+		log.Printf("Rows affected: %v", rowsAffected)
 	}
 
 	// Log the event.
