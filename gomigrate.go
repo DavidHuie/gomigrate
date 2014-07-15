@@ -219,7 +219,7 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 	}
 
 	for n, subMigration := range splitMigrationString(string(sql)) {
-		if allWhitespace.Match(subMigration) {
+		if allWhitespace.Match([]byte(subMigration)) {
 			continue
 		}
 
