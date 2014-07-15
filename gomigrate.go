@@ -218,21 +218,33 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 		return err
 	}
 
-	// Perform the migration.
-	result, err := transaction.Exec(string(sql))
-	if err != nil {
-		log.Printf("Error executing migration: %v", err)
-		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-			log.Printf("Error rolling back transaction: %v", rollbackErr)
-			return rollbackErr
+	for n, subMigration := range splitMigrationString(string(sql)) {
+		if allWhitespace.Match(subMigration) {
+			continue
 		}
-		return err
-	}
-	if rowsAffected, err := result.RowsAffected(); err != nil {
-		log.Printf("Error getting rows affected: %v", err)
-		return err
-	} else {
-		log.Printf("Rows affected: %v", rowsAffected)
+
+		log.Printf("Applying submigration: %v", n+1)
+
+		// Perform the migration.
+		result, err := transaction.Exec(string(subMigration))
+		if err != nil {
+			log.Printf("Error executing migration: %v", err)
+			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				return rollbackErr
+			}
+			return err
+		}
+		if rowsAffected, err := result.RowsAffected(); err != nil {
+			log.Printf("Error getting rows affected: %v", err)
+			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				return rollbackErr
+			}
+			return err
+		} else {
+			log.Printf("Rows affected: %v", rowsAffected)
+		}
 	}
 
 	// Log the event.

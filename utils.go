@@ -1,6 +1,7 @@
 package gomigrate
 
 import (
+	"bytes"
 	"path/filepath"
 	"regexp"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 var (
 	upMigrationFile   = regexp.MustCompile(`(\d+)_(\w+)_up\.sql`)
 	downMigrationFile = regexp.MustCompile(`(\d+)_(\w+)_down\.sql`)
+	allWhitespace     = regexp.MustCompile(`^\s*$`)
 )
 
 // Returns the migration number, type and base name, so 1, "up", "migration" from "01_migration_up.sql"
@@ -36,6 +38,11 @@ func parseMatches(matches [][][]byte, mType migrationType) (uint64, migrationTyp
 		return 0, "", "", err
 	}
 	return parsedNum, mType, string(name), nil
+}
+
+// Splits migration sql into different strings separated by a semi-colon.
+func splitMigrationString(sql string) [][]byte {
+	return bytes.SplitN([]byte(sql), []byte(";"), -1)
 }
 
 // This type is used to sort migration ids.
