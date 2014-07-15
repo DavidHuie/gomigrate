@@ -3,6 +3,7 @@
 package gomigrate
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
 	"io/ioutil"
@@ -224,6 +225,10 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 		}
 
 		log.Printf("Applying submigration: %v", n+1)
+
+		for _, line := range bytes.Split([]byte(subMigration), []byte("\n")) {
+			log.Printf("MIGRATION: %s", line)
+		}
 
 		// Perform the migration.
 		result, err := transaction.Exec(string(subMigration))
