@@ -321,7 +321,7 @@ func (m *Migrator) RollbackN(n int) error {
 }
 
 // Rolls back all migrations.
-func (m *Migrator) RollbackAll(n int) error {
+func (m *Migrator) RollbackAll() error {
 	migrations := m.Migrations(Active)
 	return m.RollbackN(len(migrations))
 }
