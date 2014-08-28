@@ -299,13 +299,29 @@ func (m *Migrator) Migrate() error {
 
 // Rolls back the last migration.
 func (m *Migrator) Rollback() error {
+	return m.RollbackN(1)
+}
+
+// Rolls back N migrations.
+func (m *Migrator) RollbackN(n int) error {
 	migrations := m.Migrations(Active)
 	if len(migrations) == 0 {
 		return NoActiveMigrations
 	}
-	lastMigration := migrations[len(migrations)-1]
-	if err := m.ApplyMigration(lastMigration, downMigration); err != nil {
-		return err
+
+	last_migration := len(migrations) - 1 - n
+
+	for i := len(migrations) - 1; i != last_migration; i-- {
+		if err := m.ApplyMigration(migrations[i], downMigration); err != nil {
+			return err
+		}
 	}
+
 	return nil
+}
+
+// Rolls back all migrations.
+func (m *Migrator) RollbackAll(n int) error {
+	migrations := m.Migrations(Active)
+	return m.RollbackN(len(migrations))
 }
