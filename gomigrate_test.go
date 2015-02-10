@@ -16,7 +16,7 @@ var (
 	adapter Migratable
 )
 
-func GetMigrator(test string) *Migrator {
+func GetMigrator(test string) (*Migrator, string) {
 	var suffix string
 	if os.Getenv("DB") == "pg" {
 		suffix = "pg"
@@ -28,12 +28,16 @@ func GetMigrator(test string) *Migrator {
 	if err != nil {
 		panic(err)
 	}
-	return m
+	return m, suffix
 }
 
 func TestNewMigrator(t *testing.T) {
-	m := GetMigrator("test1")
-	if len(m.migrations) != 1 {
+	m, d := GetMigrator("test1")
+	if d == "pg" && len(m.migrations) != 2 {
+		t.Errorf("Invalid number of migrations detected")
+	}
+
+	if d == "mysql" && len(m.migrations) != 1 {
 		t.Errorf("Invalid number of migrations detected")
 	}
 
@@ -79,7 +83,7 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 }
 
 func TestMigrationAndRollback(t *testing.T) {
-	m := GetMigrator("test1")
+	m, d := GetMigrator("test1")
 
 	if err := m.Migrate(); err != nil {
 		t.Error(err)
@@ -110,8 +114,16 @@ func TestMigrationAndRollback(t *testing.T) {
 		t.Error("Invalid status for migration")
 	}
 
-	if err := m.Rollback(); err != nil {
-		t.Error(err)
+	if d == "pg" {
+		if err := m.RollbackN(2); err != nil {
+			t.Error(err)
+		}
+	}
+
+	if d == "mysql" {
+		if err := m.Rollback(); err != nil {
+			t.Error(err)
+		}
 	}
 
 	// Ensure that the down migration ran.
@@ -120,8 +132,8 @@ func TestMigrationAndRollback(t *testing.T) {
 		"test",
 	)
 	err := row.Scan(&tableName)
-	if err != sql.ErrNoRows {
-		t.Errorf("Migration table should be deleted")
+	if err != nil && err != sql.ErrNoRows {
+		t.Errorf("Migration table should be deleted: %v", err)
 	}
 
 	// Ensure that the migration log is missing.
@@ -129,11 +141,11 @@ func TestMigrationAndRollback(t *testing.T) {
 		adapter.GetMigrationSql(),
 		1,
 	)
-	if err := row.Scan(&status); err != sql.ErrNoRows {
+	if err := row.Scan(&status); err != nil && err != sql.ErrNoRows {
 		t.Error(err)
 	}
 	if m.migrations[1].Status != Inactive {
-		t.Errorf("Invalid status for migration, %v", m.migrations[1].Status)
+		t.Errorf("Invalid status for migration, expected: %d, got: %v", Inactive, m.migrations[1].Status)
 	}
 
 	cleanup()

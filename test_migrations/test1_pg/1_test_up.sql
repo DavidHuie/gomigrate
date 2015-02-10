@@ -1,1 +1,1 @@
-create table test();
+create table if not exists test();
