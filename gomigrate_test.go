@@ -43,10 +43,10 @@ func TestNewMigrator(t *testing.T) {
 		t.Errorf("Invalid migration name detected: %s", migration.Name)
 	}
 	if migration.Id != 1 {
-		t.Errorf("Invalid migration num detected: %s", migration.Id)
+		t.Errorf("Invalid migration num detected: %d", migration.Id)
 	}
 	if migration.Status != Inactive {
-		t.Errorf("Invalid migration num detected: %s", migration.Status)
+		t.Errorf("Invalid migration num detected: %d", migration.Status)
 	}
 
 	cleanup()
