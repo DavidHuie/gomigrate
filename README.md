@@ -51,6 +51,8 @@ For a given migration, the `id` and `name` fields must be the same.
 The id field is an integer that corresponds to the order in which
 the migration should run relative to the other migrations.
 
+`id` should not be `0` as that value is used for internal validations.
+
 ### Example
 
 If I'm trying to add a "users" table to the database, I would create
