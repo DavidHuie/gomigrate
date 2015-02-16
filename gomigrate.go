@@ -3,7 +3,6 @@
 package gomigrate
 
 import (
-	"bytes"
 	"database/sql"
 	"errors"
 	"io/ioutil"
@@ -219,37 +218,25 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 		return err
 	}
 
-	for n, subMigration := range splitMigrationString(string(sql)) {
-		if allWhitespace.Match([]byte(subMigration)) {
-			continue
+	// Perform the migration.
+	result, err := transaction.Exec(string(sql))
+	if err != nil {
+		log.Printf("Error executing migration: %v", err)
+		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+			log.Printf("Error rolling back transaction: %v", rollbackErr)
+			return rollbackErr
 		}
-
-		log.Printf("Applying submigration: %v", n+1)
-
-		for _, line := range bytes.Split([]byte(subMigration), []byte("\n")) {
-			log.Printf("MIGRATION: %s", line)
+		return err
+	}
+	if rowsAffected, err := result.RowsAffected(); err != nil {
+		log.Printf("Error getting rows affected: %v", err)
+		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+			log.Printf("Error rolling back transaction: %v", rollbackErr)
+			return rollbackErr
 		}
-
-		// Perform the migration.
-		result, err := transaction.Exec(string(subMigration))
-		if err != nil {
-			log.Printf("Error executing migration: %v", err)
-			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-				log.Printf("Error rolling back transaction: %v", rollbackErr)
-				return rollbackErr
-			}
-			return err
-		}
-		if rowsAffected, err := result.RowsAffected(); err != nil {
-			log.Printf("Error getting rows affected: %v", err)
-			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-				log.Printf("Error rolling back transaction: %v", rollbackErr)
-				return rollbackErr
-			}
-			return err
-		} else {
-			log.Printf("Rows affected: %v", rowsAffected)
-		}
+		return err
+	} else {
+		log.Printf("Rows affected: %v", rowsAffected)
 	}
 
 	// Log the event.

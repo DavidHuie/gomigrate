@@ -40,11 +40,6 @@ func parseMatches(matches [][][]byte, mType migrationType) (uint64, migrationTyp
 	return parsedNum, mType, string(name), nil
 }
 
-// Splits migration sql into different strings separated by a semi-colon.
-func splitMigrationString(sql string) []string {
-	return subMigrationSplit.Split(sql, -1)
-}
-
 // This type is used to sort migration ids.
 type uint64slice []uint64
 
