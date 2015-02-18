@@ -33,7 +33,7 @@ func GetMigrator(test string) (*Migrator, string) {
 
 func TestNewMigrator(t *testing.T) {
 	m, d := GetMigrator("test1")
-	if d == "pg" && len(m.migrations) != 2 {
+	if d == "pg" && len(m.migrations) != 3 {
 		t.Errorf("Invalid number of migrations detected")
 	}
 
@@ -115,7 +115,7 @@ func TestMigrationAndRollback(t *testing.T) {
 	}
 
 	if d == "pg" {
-		if err := m.RollbackN(2); err != nil {
+		if err := m.RollbackN(3); err != nil {
 			t.Error(err)
 		}
 	}
