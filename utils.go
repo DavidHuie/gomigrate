@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	upMigrationFile   = regexp.MustCompile(`(\d+)_(\w+)_up\.sql`)
-	downMigrationFile = regexp.MustCompile(`(\d+)_(\w+)_down\.sql`)
+	upMigrationFile   = regexp.MustCompile(`(\d+)_([\w-]+)_up\.sql`)
+	downMigrationFile = regexp.MustCompile(`(\d+)_([\w-]+)_down\.sql`)
 	subMigrationSplit = regexp.MustCompile(`;\s*`)
 	allWhitespace     = regexp.MustCompile(`^\s*$`)
 )
