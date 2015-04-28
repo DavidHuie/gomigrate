@@ -40,7 +40,7 @@ func (p Postgres) MigrationLogDeleteSql() string {
 type Mysql struct{}
 
 func (m Mysql) SelectMigrationTableSql() string {
-	return "SELECT table_name FROM information_schema.tables WHERE table_name = ?"
+	return "SELECT table_name FROM information_schema.tables WHERE table_name = ? AND table_schema = (SELECT DATABASE())"
 }
 
 func (m Mysql) CreateMigrationTableSql() string {
