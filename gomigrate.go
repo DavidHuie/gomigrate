@@ -223,7 +223,6 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 
 	// Perform the migration.
 	for _, cmd := range commands {
-		log.Printf("running command %s\n", cmd)
 		result, err := transaction.Exec(cmd)
 		if err != nil {
 			log.Printf("Error executing migration: %v", err)
