@@ -218,25 +218,31 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 		return err
 	}
 
+	// Certain adapters can not handle multiple sql commands in one file so we need the adapter to split up the command
+	commands := m.dbAdapter.GetMigrationCommands(string(sql))
+
 	// Perform the migration.
-	result, err := transaction.Exec(string(sql))
-	if err != nil {
-		log.Printf("Error executing migration: %v", err)
-		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-			log.Printf("Error rolling back transaction: %v", rollbackErr)
-			return rollbackErr
+	for _, cmd := range commands {
+		log.Printf("running command %s\n", cmd)
+		result, err := transaction.Exec(cmd)
+		if err != nil {
+			log.Printf("Error executing migration: %v", err)
+			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				return rollbackErr
+			}
+			return err
 		}
-		return err
-	}
-	if rowsAffected, err := result.RowsAffected(); err != nil {
-		log.Printf("Error getting rows affected: %v", err)
-		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-			log.Printf("Error rolling back transaction: %v", rollbackErr)
-			return rollbackErr
+		if rowsAffected, err := result.RowsAffected(); err != nil {
+			log.Printf("Error getting rows affected: %v", err)
+			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				return rollbackErr
+			}
+			return err
+		} else {
+			log.Printf("Rows affected: %v", rowsAffected)
 		}
-		return err
-	} else {
-		log.Printf("Rows affected: %v", rowsAffected)
 	}
 
 	// Log the event.
