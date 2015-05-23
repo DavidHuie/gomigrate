@@ -1,4 +1,0 @@
-CREATE TABLE tt (c text NOT NULL);
-
-INSERT INTO tt VALUES('a');
-INSERT INTO tt VALUES('x');
