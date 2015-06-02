@@ -296,7 +296,7 @@ func (m *Migrator) Rollback() error {
 func (m *Migrator) RollbackN(n int) error {
 	migrations := m.Migrations(Active)
 	if len(migrations) == 0 {
-		return NoActiveMigrations
+		return nil
 	}
 
 	last_migration := len(migrations) - 1 - n
