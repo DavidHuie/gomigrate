@@ -228,15 +228,18 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 		}
 		return err
 	}
-	if rowsAffected, err := result.RowsAffected(); err != nil {
-		log.Printf("Error getting rows affected: %v", err)
-		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-			log.Printf("Error rolling back transaction: %v", rollbackErr)
-			return rollbackErr
+
+	if result != nil {
+		if rowsAffected, err := result.RowsAffected(); err != nil {
+			log.Printf("Error getting rows affected: %v", err)
+			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
+				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				return rollbackErr
+			}
+			return err
+		} else {
+			log.Printf("Rows affected: %v", rowsAffected)
 		}
-		return err
-	} else {
-		log.Printf("Rows affected: %v", rowsAffected)
 	}
 
 	// Log the event.
@@ -293,7 +296,7 @@ func (m *Migrator) Rollback() error {
 func (m *Migrator) RollbackN(n int) error {
 	migrations := m.Migrations(Active)
 	if len(migrations) == 0 {
-		return NoActiveMigrations
+		return nil
 	}
 
 	last_migration := len(migrations) - 1 - n
