@@ -22,7 +22,7 @@ Given a `database/sql` database connection to a PostgreSQL database, `db`,
 and a directory to migration files, create a migrator:
 
 ```go
-migrator := gomigrate.NewMigrator(db, gomigrate.Postgres{}, "./migrations")
+migrator, _ := gomigrate.NewMigrator(db, gomigrate.Postgres{}, "./migrations")
 ```
 
 To migrate the database, run:
