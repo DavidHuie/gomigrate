@@ -9,7 +9,7 @@ before_script:
   - mysql -uroot -e "CREATE DATABASE gomigrate;"
   - go get github.com/lib/pq
   - go get github.com/go-sql-driver/mysql
-  - get get github.com/mattn/go-sqlite3
+  - go get github.com/mattn/go-sqlite3
 script:
   - DB=pg go test
   - DB=mysql go test
