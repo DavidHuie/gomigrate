@@ -9,6 +9,7 @@ A SQL database migration toolkit in Golang.
 - PostgreSQL
 - MariaDB
 - MySQL
+- Sqlite3
 
 ## Usage
 

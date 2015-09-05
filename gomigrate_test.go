@@ -9,35 +9,35 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var (
 	db      *sql.DB
 	adapter Migratable
+	dbType  string
 )
 
-func GetMigrator(test string) (*Migrator, string) {
-	var suffix string
-	if os.Getenv("DB") == "pg" {
-		suffix = "pg"
-	} else {
-		suffix = "mysql"
-	}
-	path := fmt.Sprintf("test_migrations/%s_%s", test, suffix)
+func GetMigrator(test string) *Migrator {
+	path := fmt.Sprintf("test_migrations/%s_%s", test, dbType)
 	m, err := NewMigrator(db, adapter, path)
 	if err != nil {
 		panic(err)
 	}
-	return m, suffix
+	return m
 }
 
 func TestNewMigrator(t *testing.T) {
-	m, d := GetMigrator("test1")
-	if d == "pg" && len(m.migrations) != 4 {
+	m := GetMigrator("test1")
+	if dbType == "pg" && len(m.migrations) != 4 {
 		t.Errorf("Invalid number of migrations detected")
 	}
 
-	if d == "mysql" && len(m.migrations) != 1 {
+	if dbType == "mysql" && len(m.migrations) != 1 {
+		t.Errorf("Invalid number of migrations detected")
+	}
+
+	if dbType == "sqlite3" && len(m.migrations) != 1 {
 		t.Errorf("Invalid number of migrations detected")
 	}
 
@@ -83,7 +83,7 @@ func TestCreatingMigratorWhenTableExists(t *testing.T) {
 }
 
 func TestMigrationAndRollback(t *testing.T) {
-	m, d := GetMigrator("test1")
+	m := GetMigrator("test1")
 
 	if err := m.Migrate(); err != nil {
 		t.Error(err)
@@ -114,13 +114,19 @@ func TestMigrationAndRollback(t *testing.T) {
 		t.Error("Invalid status for migration")
 	}
 
-	if d == "pg" {
+	if dbType == "pg" {
 		if err := m.RollbackN(4); err != nil {
 			t.Error(err)
 		}
 	}
 
-	if d == "mysql" {
+	if dbType == "mysql" {
+		if err := m.Rollback(); err != nil {
+			t.Error(err)
+		}
+	}
+
+	if dbType == "sqlite3" {
 		if err := m.Rollback(); err != nil {
 			t.Error(err)
 		}
@@ -160,16 +166,27 @@ func cleanup() {
 
 func init() {
 	var err error
-	if os.Getenv("DB") == "pg" {
+
+	switch os.Getenv("DB") {
+	case "pg":
+		dbType = "pg"
 		log.Print("Using postgres")
 		adapter = Postgres{}
 		db, err = sql.Open("postgres", "host=localhost dbname=gomigrate sslmode=disable")
-		if err != nil {
-			panic(err)
-		}
-	} else {
+	default:
+	case "mysql":
+		dbType = "mysql"
 		log.Print("Using mysql")
 		adapter = Mariadb{}
 		db, err = sql.Open("mysql", "gomigrate:password@/gomigrate")
+	case "sqlite3":
+		dbType = "sqlite3"
+		log.Print("Using sqlite3")
+		adapter = Sqlite3{}
+		db, err = sql.Open("sqlite3", "file::memory:?cache=shared")
+	}
+
+	if err != nil {
+		panic(err)
 	}
 }
