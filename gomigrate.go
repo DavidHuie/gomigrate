@@ -53,7 +53,7 @@ func (m *Migrator) MigrationTableExists() (bool, error) {
 
 // Creates the migrations table if it doesn't exist.
 func (m *Migrator) CreateMigrationsTable() error {
-	_, err := m.DB.Query(m.dbAdapter.CreateMigrationTableSql())
+	_, err := m.DB.Exec(m.dbAdapter.CreateMigrationTableSql())
 	if err != nil {
 		log.Fatalf("Error creating migrations table: %v", err)
 	}
