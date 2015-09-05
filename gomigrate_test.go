@@ -29,15 +29,14 @@ func GetMigrator(test string) *Migrator {
 
 func TestNewMigrator(t *testing.T) {
 	m := GetMigrator("test1")
-	if dbType == "pg" && len(m.migrations) != 4 {
+	switch {
+	case dbType == "pg" && len(m.migrations) != 4:
 		t.Errorf("Invalid number of migrations detected")
-	}
 
-	if dbType == "mysql" && len(m.migrations) != 1 {
+	case dbType == "mysql" && len(m.migrations) != 1:
 		t.Errorf("Invalid number of migrations detected")
-	}
 
-	if dbType == "sqlite3" && len(m.migrations) != 1 {
+	case dbType == "sqlite3" && len(m.migrations) != 1:
 		t.Errorf("Invalid number of migrations detected")
 	}
 
@@ -113,23 +112,8 @@ func TestMigrationAndRollback(t *testing.T) {
 	if status != Active || m.migrations[1].Status != Active {
 		t.Error("Invalid status for migration")
 	}
-
-	if dbType == "pg" {
-		if err := m.RollbackN(4); err != nil {
-			t.Error(err)
-		}
-	}
-
-	if dbType == "mysql" {
-		if err := m.Rollback(); err != nil {
-			t.Error(err)
-		}
-	}
-
-	if dbType == "sqlite3" {
-		if err := m.Rollback(); err != nil {
-			t.Error(err)
-		}
+	if err := m.RollbackN(len(m.migrations)); err != nil {
+		t.Error(err)
 	}
 
 	// Ensure that the down migration ran.
