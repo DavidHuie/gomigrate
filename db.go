@@ -1,11 +1,14 @@
 package gomigrate
 
+import "strings"
+
 type Migratable interface {
 	SelectMigrationTableSql() string
 	CreateMigrationTableSql() string
 	GetMigrationSql() string
 	MigrationLogInsertSql() string
 	MigrationLogDeleteSql() string
+	GetMigrationCommands(string) []string
 }
 
 // POSTGRES
@@ -35,6 +38,10 @@ func (p Postgres) MigrationLogDeleteSql() string {
 	return "DELETE FROM gomigrate WHERE migration_id = $1"
 }
 
+func (p Postgres) GetMigrationCommands(sql string) []string {
+	return []string{sql}
+}
+
 // MYSQL
 
 type Mysql struct{}
@@ -61,6 +68,12 @@ func (m Mysql) MigrationLogInsertSql() string {
 
 func (m Mysql) MigrationLogDeleteSql() string {
 	return "DELETE FROM gomigrate WHERE migration_id = ?"
+}
+
+func (m Mysql) GetMigrationCommands(sql string) []string {
+	count := strings.Count(sql, ";")
+	commands := strings.SplitN(string(sql), ";", count)
+	return commands
 }
 
 // MARIADB
@@ -94,4 +107,8 @@ func (s Sqlite3) MigrationLogInsertSql() string {
 
 func (s Sqlite3) MigrationLogDeleteSql() string {
 	return "DELETE FROM gomigrate WHERE migration_id = ?"
+}
+
+func (s Sqlite3) GetMigrationCommands(sql string) []string {
+	return []string{sql}
 }

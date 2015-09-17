@@ -152,12 +152,6 @@ func init() {
 	var err error
 
 	switch os.Getenv("DB") {
-	case "pg":
-		dbType = "pg"
-		log.Print("Using postgres")
-		adapter = Postgres{}
-		db, err = sql.Open("postgres", "host=localhost dbname=gomigrate sslmode=disable")
-	default:
 	case "mysql":
 		dbType = "mysql"
 		log.Print("Using mysql")
@@ -168,6 +162,11 @@ func init() {
 		log.Print("Using sqlite3")
 		adapter = Sqlite3{}
 		db, err = sql.Open("sqlite3", "file::memory:?cache=shared")
+	default:
+		dbType = "pg"
+		log.Print("Using postgres")
+		adapter = Postgres{}
+		db, err = sql.Open("postgres", "host=localhost dbname=gomigrate sslmode=disable")
 	}
 
 	if err != nil {
