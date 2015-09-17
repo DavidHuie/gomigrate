@@ -68,3 +68,30 @@ func (m Mysql) MigrationLogDeleteSql() string {
 type Mariadb struct {
 	Mysql
 }
+
+// SQLITE3
+
+type Sqlite3 struct{}
+
+func (s Sqlite3) SelectMigrationTableSql() string {
+	return "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?"
+}
+
+func (s Sqlite3) CreateMigrationTableSql() string {
+	return `CREATE TABLE gomigrate (
+  id INTEGER PRIMARY KEY,
+  migration_id INTEGER NOT NULL UNIQUE
+)`
+}
+
+func (s Sqlite3) GetMigrationSql() string {
+	return "SELECT migration_id FROM gomigrate WHERE migration_id = ?"
+}
+
+func (s Sqlite3) MigrationLogInsertSql() string {
+	return "INSERT INTO gomigrate (migration_id) values (?)"
+}
+
+func (s Sqlite3) MigrationLogDeleteSql() string {
+	return "DELETE FROM gomigrate WHERE migration_id = ?"
+}
