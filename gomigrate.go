@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io/ioutil"
 	"log"
+	"os"
 	"path/filepath"
 	"sort"
 )
@@ -34,20 +35,34 @@ type Migrator struct {
 	migrations     map[uint64]*Migration
 }
 
+// Logger is the instance of a StdLogger interface to log events to.
+// By default it is set to send all log messages to stdout,
+// but you can set it to redirect wherever you want by instantiating
+// your own logger.
+var Logger StdLogger = log.New(os.Stdout, "[gomigrate] ", log.LstdFlags)
+
+// StdLogger is used to log error messages.
+type StdLogger interface {
+	Print(v ...interface{})
+	Printf(format string, v ...interface{})
+	Println(v ...interface{})
+	Fatalf(format string, v ...interface{})
+}
+
 // Returns true if the migration table already exists.
 func (m *Migrator) MigrationTableExists() (bool, error) {
 	row := m.DB.QueryRow(m.dbAdapter.SelectMigrationTableSql(), migrationTableName)
 	var tableName string
 	err := row.Scan(&tableName)
 	if err == sql.ErrNoRows {
-		log.Print("Migrations table not found")
+		Logger.Print("Migrations table not found")
 		return false, nil
 	}
 	if err != nil {
-		log.Printf("Error checking for migration table: %v", err)
+		Logger.Printf("Error checking for migration table: %v", err)
 		return false, err
 	}
-	log.Print("Migrations table found")
+	Logger.Print("Migrations table found")
 	return true, nil
 }
 
@@ -55,10 +70,10 @@ func (m *Migrator) MigrationTableExists() (bool, error) {
 func (m *Migrator) CreateMigrationsTable() error {
 	_, err := m.DB.Exec(m.dbAdapter.CreateMigrationTableSql())
 	if err != nil {
-		log.Fatalf("Error creating migrations table: %v", err)
+		Logger.Fatalf("Error creating migrations table: %v", err)
 	}
 
-	log.Printf("Created migrations table: %s", migrationTableName)
+	Logger.Printf("Created migrations table: %s", migrationTableName)
 
 	return nil
 }
@@ -72,7 +87,7 @@ func NewMigrator(db *sql.DB, adapter Migratable, migrationsPath string) (*Migrat
 		path = append(path, '/')
 	}
 
-	log.Printf("Migrations path: %s", path)
+	Logger.Printf("Migrations path: %s", path)
 
 	migrator := Migrator{
 		db,
@@ -109,17 +124,17 @@ func (m *Migrator) fetchMigrations() error {
 
 	matches, err := filepath.Glob(string(pathGlob))
 	if err != nil {
-		log.Fatalf("Error while globbing migrations: %v", err)
+		Logger.Fatalf("Error while globbing migrations: %v", err)
 	}
 
 	for _, match := range matches {
 		num, migrationType, name, err := parseMigrationPath(match)
 		if err != nil {
-			log.Printf("Invalid migration file found: %s", match)
+			Logger.Printf("Invalid migration file found: %s", match)
 			continue
 		}
 
-		log.Printf("Migration file found: %s", match)
+		Logger.Printf("Migration file found: %s", match)
 
 		migration, ok := m.migrations[num]
 		if !ok {
@@ -140,12 +155,12 @@ func (m *Migrator) fetchMigrations() error {
 			if path == "" {
 				path = migration.DownPath
 			}
-			log.Printf("Invalid migration pair for path: %s", path)
+			Logger.Printf("Invalid migration pair for path: %s", path)
 			return InvalidMigrationPair
 		}
 	}
 
-	log.Printf("Migrations file pairs found: %v", len(m.migrations))
+	Logger.Printf("Migrations file pairs found: %v", len(m.migrations))
 
 	return nil
 }
@@ -161,7 +176,7 @@ func (m *Migrator) getMigrationStatuses() error {
 			continue
 		}
 		if err != nil {
-			log.Printf(
+			Logger.Printf(
 				"Error getting migration status for %s: %v",
 				migration.Name,
 				err,
@@ -205,16 +220,16 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 		return InvalidMigrationType
 	}
 
-	log.Printf("Applying migration: %s", path)
+	Logger.Printf("Applying migration: %s", path)
 
 	sql, err := ioutil.ReadFile(path)
 	if err != nil {
-		log.Printf("Error reading migration: %s", path)
+		Logger.Printf("Error reading migration: %s", path)
 		return err
 	}
 	transaction, err := m.DB.Begin()
 	if err != nil {
-		log.Printf("Error opening transaction: %v", err)
+		Logger.Printf("Error opening transaction: %v", err)
 		return err
 	}
 
@@ -225,23 +240,23 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 	for _, cmd := range commands {
 		result, err := transaction.Exec(cmd)
 		if err != nil {
-			log.Printf("Error executing migration: %v", err)
+			Logger.Printf("Error executing migration: %v", err)
 			if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-				log.Printf("Error rolling back transaction: %v", rollbackErr)
+				Logger.Printf("Error rolling back transaction: %v", rollbackErr)
 				return rollbackErr
 			}
 			return err
 		}
 		if result != nil {
 			if rowsAffected, err := result.RowsAffected(); err != nil {
-				log.Printf("Error getting rows affected: %v", err)
+				Logger.Printf("Error getting rows affected: %v", err)
 				if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-					log.Printf("Error rolling back transaction: %v", rollbackErr)
+					Logger.Printf("Error rolling back transaction: %v", rollbackErr)
 					return rollbackErr
 				}
 				return err
 			} else {
-				log.Printf("Rows affected: %v", rowsAffected)
+				Logger.Printf("Rows affected: %v", rowsAffected)
 			}
 		}
 	}
@@ -259,9 +274,9 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 		)
 	}
 	if err != nil {
-		log.Printf("Error logging migration: %v", err)
+		Logger.Printf("Error logging migration: %v", err)
 		if rollbackErr := transaction.Rollback(); rollbackErr != nil {
-			log.Printf("Error rolling back transaction: %v", rollbackErr)
+			Logger.Printf("Error rolling back transaction: %v", rollbackErr)
 			return rollbackErr
 		}
 		return err
@@ -269,7 +284,7 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 
 	// Commit and update the struct status.
 	if err := transaction.Commit(); err != nil {
-		log.Printf("Error commiting transaction: %v", err)
+		Logger.Printf("Error commiting transaction: %v", err)
 		return err
 	}
 	if mType == upMigration {
