@@ -26,6 +26,12 @@ and a directory to migration files, create a migrator:
 migrator, _ := gomigrate.NewMigrator(db, gomigrate.Postgres{}, "./migrations")
 ```
 
+You may also specify a specific logger to use, such as logrus:
+
+```go
+migrator, _ := gomigrate.NewMigratorWithLogger(db, gomigrate.Postgres{}, "./migrations", logrus.New())
+```
+
 To migrate the database, run:
 
 ```go
