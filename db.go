@@ -112,3 +112,34 @@ func (s Sqlite3) MigrationLogDeleteSql() string {
 func (s Sqlite3) GetMigrationCommands(sql string) []string {
 	return []string{sql}
 }
+
+// SqlServer
+
+type SqlServer struct{}
+
+func (s SqlServer) SelectMigrationTableSql() string {
+	return "SELECT name FROM  sys.objects  WHERE object_id = object_id(?)"
+}
+
+func (s SqlServer) CreateMigrationTableSql() string {
+	return `CREATE TABLE gomigrate (
+                  id           INT     IDENTITY(1,1)     PRIMARY KEY,
+                  migration_id BIGINT  NOT NULL
+                )`
+}
+
+func (s SqlServer) GetMigrationSql() string {
+	return `SELECT migration_id FROM gomigrate WHERE migration_id = ?`
+}
+
+func (s SqlServer) MigrationLogInsertSql() string {
+	return "INSERT INTO gomigrate (migration_id) values (?)"
+}
+
+func (s SqlServer) MigrationLogDeleteSql() string {
+	return "DELETE FROM gomigrate WHERE migration_id = ?"
+}
+
+func (s SqlServer) GetMigrationCommands(sql string) []string {
+	return []string{sql}
+}
