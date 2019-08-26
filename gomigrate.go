@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
 
 type migrationType string
@@ -238,6 +239,18 @@ func (m *Migrator) ApplyMigration(migration *Migration, mType migrationType) err
 
 	// Perform the migration.
 	for _, cmd := range commands {
+		cmd = strings.ReplaceAll(cmd, "\n", "") // strip off leading whitespace
+		if strings.HasPrefix(cmd, "SELECT") && strings.HasSuffix(cmd, "AS comment") {
+			row := transaction.QueryRow(cmd)
+			var comment string
+			err = row.Scan(&comment)
+			if err != nil {
+				m.logger.Printf("Error executing query comment: %v", err)
+				return err
+			}
+			m.logger.Printf("Comment: %v", comment)
+			continue
+		}
 		result, err := transaction.Exec(cmd)
 		if err != nil {
 			m.logger.Printf("Error executing migration: %v", err)
